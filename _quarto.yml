@@ -3,12 +3,11 @@ project:
   output-dir: docs
 
 website:
-  title: "kylielay.github.io"
+  title: "Kylie Lay"
   navbar:
     left:
-      - href: index.qmd
-        text: Home
-      - about.qmd
+      - href: finalproject.qmd
+        text: Final Project
 
 format:
   html:
@@ -17,6 +16,7 @@ format:
       - brand
     css: styles.css
     toc: true
-
-
-
+    backgroundcolor: "#cec1d2"
+    fontcolor: "#511b64"
+    linkcolor: "#7e4592"
+    mainfont: "sarif"

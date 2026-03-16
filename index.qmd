@@ -1,11 +1,13 @@
 ---
-title: "kylielay.github.io"
+title: "Kylie Lay"
+image: githubprofile.jpg
+about:
+  template: jolla
+  links:
+    - icon: github
+      text: Github
+      href: https://github.com/kylielay
+    - icon: linkedin
+      text: LinkedIn
+      href: https://www.linkedin.com/in/kylie-lay-7a432b323
 ---
-
-This is a Quarto website.
-
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
-
-```{r}
-1 + 1
-```
