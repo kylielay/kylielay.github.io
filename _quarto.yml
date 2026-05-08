@@ -6,8 +6,8 @@ website:
   title: "Kylie Lay"
   navbar:
     left:
-      - href: finalproject.qmd
-        text: Final Project
+      - href: math-437-project.qmd
+        text: Stats Down South (Park)
 
 format:
   html:

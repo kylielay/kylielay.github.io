@@ -1,0 +1,399 @@
+---
+title: "Stats Down South (Park)"
+---
+
+## Summary
+
+My objective was to predict the average rating of a South Park episode on IMDb. Ultimately, I found that the model I came up with doesn't have any practical uses, since both the response and the predictors are equally accessible on the same website.
+
+Furthermore, since the data on IMDb comes from a voluntary sample, the response variable (the average rating of an episode) tended to be very high. This can be seen in the histogram below showing data from the training set, where the x-axis shows the average rating out of 10 stars and the heights of the bars show the number of episodes with that average rating. We can see that the histogram is centered at about 8 stars, with only a few episodes getting an average rating below 7 stars.
+
+```{r}
+#| label: AverageRating histogram for summary
+#| message: FALSE
+
+ggplot2::ggplot(
+  data = SouthParkRshiny::SouthPark_IMDB_Data[which(SouthParkRshiny::SouthPark_IMDB_Data$Year <= 2013),],
+  mapping = ggplot2::aes(
+    x = AverageRating
+  )
+) +
+  ggplot2::geom_histogram() +
+  ggplot2::labs(
+    x = "Average Rating out of 10",
+    y = "Number of Episodes",
+    title = "South Park IMDb"
+  )
+```
+
+Because of this, the model tended to overestimate episodes with a lower average rating.
+
+## Motivation and Context
+
+```{r}
+#| label: do this first
+#| echo: false
+#| message: false
+
+here::i_am("math-437-project-template.qmd")
+```
+
+I am investigating whether or not the average rating of a South Park episode on IMDb can be predicted using data about the episode such as the number of votes it got on IMDb. Specifically, what I am trying to predict is the average of the ratings an episode received among all of the users that gave it a rating from 1 to 10 stars. The reason I chose to investigate this is because the average rating of an episode seemed like the most appropriate metric for measuring how well an episode did among audiences, which can be useful in determining how future episodes should be written.
+
+## Packages Used In This Analysis
+
+```{r}
+#| label: load packages
+#| message: false
+#| warning: false
+
+library(here)
+library(dplyr)
+library(ggplot2)
+library(parsnip)
+library(recipes)
+library(workflows)
+library(rsample)
+library(tune)
+library(yardstick)
+```
+
+| Package | Use |
+|-------------------------------|----------------------------------------|
+| [here](https://github.com/jennybc/here_here) | to easily load and save data |
+| [dplyr](https://dplyr.tidyverse.org/) | to massage and summarize data |
+| [ggplot2](https://ggplot2.tidyverse.org/) | to create nice-looking and informative graphs |
+| [parsnip](https://parsnip.tidymodels.org/) | to create the random forest model |
+| [recipes](https://recipes.tidymodels.org/) | to prepare data for modeling |
+| [workflows](https://workflows.tidymodels.org/) | to put together and finalize the model |
+| [rsample](https://rsample.tidymodels.org/) | to set up cross-validation |
+| [tune](https://tune.tidymodels.org/) | to perform cross-validation |
+| [yardstick](https://yardstick.tidymodels.org/) | to set metrics for cross-validation |
+
+## Data Description
+
+I will be using data from the `SouthPark_IMDB_Data` data set. Information about the data can be found [here](https://github.com/pdrhlik/southparkr). This data was collected by Amalan Mahendran, or Amalan-ConStat on GitHub. The information in the data set was taken from South Park's IMDb website and seems to have been collected to be used in other users' statistical analysis. One observation represents one episode of South Park. There are 326 observations and 8 variables in this data set.
+
+```{r}
+#| label: import data
+#| message: false
+#| warning: false
+
+library(SouthParkRshiny)
+```
+
+## Data Wrangling
+
+I split the data by putting episodes from 2013 or earlier into the training set, and episodes from after 2013 into the test set. This left me with a reasonable amount of data in both sets (248 observations in the training set and 78 observations in the test set). I did the split based on the year the episodes were aired because this puts the earliest episodes in the training set and the latest episodes in the test set, which prevents our analysis later from being biased by data "from the future."
+
+```{r}
+#| label: training/test sets
+
+sp_train <- SouthPark_IMDB_Data[which(SouthPark_IMDB_Data$Year <= 2013),]
+sp_test <- SouthPark_IMDB_Data[which(SouthPark_IMDB_Data$Year > 2013),]
+```
+
+## Exploratory Data Analysis
+
+In this section, my goal was to determine which variables in the data set would be most appropriate to include in my model.
+
+First, I will explore the `AverageRating` variable, since this will be my response variable. This variable measures the average rating of an episode on IMDb on a scale from 1 to 10 stars. I assumed most of the ratings would come from people who had a strong opinion about the show. Furthermore, I believed that those who didn't like the show would stop watching after a few minutes, and thus not leave a rating. Therefore, I assumed that `AverageRating` would be centered around 8 stars with a relatively low standard deviation. I also thought that some episodes were bound to do poorly, so I assumed the distribution of `AverageRating` would have a left tail.
+
+Looking at the 5 number summary as well as the mean and standard deviation of `AverageRating`, we can see that my assumptions about the center and variability were mostly correct. However, comparing the median to the mean, we can see that they are very similar, which suggests that the shape of the distribution is more symmetric than I thought. In fact, even the minimum is higher than I expected.
+
+```{r}
+#| label: AverageRating 5 number summary + mean & sd
+
+sp_train |>
+  summarize(
+    min = min(AverageRating),
+    Q1 = quantile(AverageRating, 0.25),
+    median = median(AverageRating),
+    Q3 = quantile(AverageRating, 0.75),
+    max = max(AverageRating),
+    mean = mean(AverageRating),
+    sd = sd(AverageRating)
+  )
+```
+
+Looking at the histogram for `AverageRating`, we can get a better idea of the shape of the distribution. While there is a slight left skew, the distribution is mostly symmetric.
+
+```{r}
+#| label: AverageRating histogram
+#| message: FALSE
+
+ggplot(
+  data = sp_train,
+  mapping = aes(
+    x = AverageRating
+  )
+) +
+  geom_histogram() +
+  labs(
+    x = "Average Rating out of 10",
+    y = "Number of Episodes",
+    title = "South Park IMDb"
+  )
+```
+
+This begs the question, how does a show as controversial as South Park get such high average ratings? If we look at the IMDb page for South Park, we do see that it tends to get an overwhelming amount of high ratings compared to low ratings. Looking at other shows on IMDb, we see that they also tend to get higher average ratings in general, so this isn't something specific to South Park. It could be that users don't want to have disliked shows on their profile, or that they don't watch disliked episodes for long enough to give them a rating, but this is ultimately all speculation. However, it could be important to consider when using the average rating to measure the general reception of an episode that the information on IMDb comes from a voluntary sample. The average rating on IMDb might be higher than if we took a truly random sample of people who watched South Park and asked for their ratings.
+
+Next, I moved on to the rest of the variables in the data set. I ignored the `PrimaryTitle` and `OriginalTitle` variables, since they basically serve as ID variables.
+
+The `Season`, `Episode`, and `Year` variables serve to catalog when an episode was made. Since I split my data based on `Year`, these did not seem appropriate to include in my model.
+
+The histogram of `Runtime` doesn't yield anything surprising.
+
+```{r}
+#| label: Runtime histogram
+#| message: FALSE
+
+ggplot(
+  data = sp_train,
+  mapping = aes(
+    x = Runtime
+  )
+) +
+  geom_histogram() +
+  labs(
+    x = "Runtime (minutes)",
+    y = "Number of Episodes",
+    title = "South Park IMDb"
+  )
+```
+
+An overwhelming majority of episodes have a runtime of about 22 minutes, with a few episodes being especially long. This is to be expected, since most television series have episodes that run for about 20 minutes, with some having TV specials that run for longer than an average episode. This means that for the majority of episodes, `Runtime` isn't a very informative variable. However, this may be relevant for analyzing particularly long episodes.
+
+I thought that the `NumberOfVotes` variable would be the most informative variable, so I decided to explore it in more detail. Since South Park is a popular show, I expected `NumberOfVotes` to have a high center, somewhere in the thousands. Some episodes will be more popular than others, so I assumed there would be a high amount of variability.
+
+Looking at the 5 number summary as well as the mean and standard deviation of `NumberOfVotes`, we can see that my guesses were correct. However, the mean is noticeably higher than the median, suggesting a right-skewed distribution.
+
+```{r}
+#| label: NumberOfVotes 5 number summary + mean & sd
+
+sp_train |>
+  summarize(
+    min = min(NumberOfVotes),
+    Q1 = quantile(NumberOfVotes, 0.25),
+    median = median(NumberOfVotes),
+    Q3 = quantile(NumberOfVotes, 0.75),
+    max = max(NumberOfVotes),
+    mean = mean(NumberOfVotes),
+    sd = sd(NumberOfVotes)
+  )
+```
+
+We have a much better idea of the extremeness of this skew when looking at the histogram.
+
+```{r}
+#| label: NumberOfVotes histogram
+#| message: FALSE
+
+ggplot(
+  data = sp_train,
+  mapping = aes(
+    x = NumberOfVotes
+  )
+) +
+  geom_histogram() +
+  labs(
+    x = "Number of Votes on IMDb",
+    y = "Number of Episodes",
+    title = "South Park IMDb"
+  )
+```
+
+This skew seems to have been made even more extreme by a few outliers. This leads me to question, what are these points, and why do they have so many more votes?
+
+The point on the far right corresponds to the episode "Scott Tenorman Must Die," which had one of the best receptions out of any South Park episode when it released. The other two rightmost points correspond to the episodes "Make Love, Not Warcraft" and "The Return of the Fellowship of the Ring to the Two Towers," whose popularity could be attributed to the obvious references in their titles attracting more viewers.
+
+Another interesting point is the one on the far left, which corresponds to the unaired pilot. It makes sense that this wouldn't get as many votes, since the pilot of a show tends to be seen by less people.
+
+Looking at `AverageRating` and `NumberOfVotes` on their own made me wonder if there was a more direct connection between the average rating of a show and how many votes it got. I assumed that an episode having more votes meant it was more popular, and thus had a higher average rating.
+
+We can look at a scatterplot between `NumberOfVotes` and `AverageRating`, where each point represents one episode.
+
+```{r}
+#| label: NumberOfVotes & AverageRating scatterplot
+
+ggplot(
+  data = sp_train,
+  mapping = aes(
+    x = NumberOfVotes,
+    y = AverageRating
+  )
+) +
+  geom_point() +
+  labs(
+    x = "Number of Votes on IMDb",
+    y = "Average Rating out of 10",
+    title = "South Park IMDb"
+  )
+```
+
+My assumption generally appears to be true. 
+
+Due to what was found earlier, I believe the relationship between `NumberOfVotes` and `AverageRating` would give me the most useful information compared to other relationships. Thus, I decided to follow up on the scatterplot between `NumberOfVotes` and `AverageRating`. Since the relationship appears nonlinear, we can plot a local regression curve to get a better idea of the relationship.
+
+```{r}
+#| label: NumberOfVotes & AverageRating scatterplot with loess
+#| message: FALSE
+
+ggplot(
+  data = sp_train,
+  mapping = aes(
+    x = NumberOfVotes,
+    y = AverageRating
+  )
+) +
+  geom_point() +
+  labs(
+    x = "Number of Votes on IMDb",
+    y = "Average Rating out of 10",
+    title = "South Park IMDb"
+  ) +
+  geom_smooth(
+    method = "loess",
+    se = FALSE
+  )
+```
+
+We can see that the point on the far left is dragging the left side of our curve up significantly. The question is, what should be done about this point?
+
+Since this point has the least number of votes, we can deduce that it belongs to the unaired pilot. Since all future episodes of South Park will be aired, this point is probably not relevant to our analysis of future episodes. We might consider removing that point and only looking at episodes that were aired on television.
+
+How does removing this point change our model? Below is a scatterplot with the point removed.
+
+```{r}
+#| label: NumberOfVotes & AverageRating scatterplot with pilot removed
+#| message: FALSE
+
+nopilot_train <- sp_train[-which(sp_train$PrimaryTitle == "Unaired Pilot"),]
+
+ggplot(
+  data = nopilot_train,
+  mapping = aes(
+    x = NumberOfVotes,
+    y = AverageRating
+  )
+) +
+  geom_point() +
+  labs(
+    x = "Number of Votes on IMDb",
+    y = "Average Rating out of 10",
+    title = "South Park IMDb without the Pilot"
+  ) +
+  geom_smooth(
+    method = "loess",
+    se = FALSE
+  )
+```
+
+The local regression curve seems to be doing a better job of fitting the data on the left side of the graph now that the pilot was removed. The outliers on the right side of the graph pose no issue, since they follow the trend of the rest of the data.
+
+Due to what I found, I decided to make my model using the training set with the pilot removed.
+
+## Modeling
+
+Here, I fit a random forest model predicting `AverageRating` from `Episode`, `Runtime`, and `NumberOfVotes`. Random forests use decision trees, which try to put similar observations into the same regions as each other. The way decision trees do this is by splitting one region into two based on the value of a certain predictor, then repeating this process until we tell it to stop. In random forests, we take a random sample from our data with replacement, called a bootstrap resample. Then, we fit a decision tree on that bootstrap resample, but at each split, we restrict the number of predictors available. We do this in order to decrease the amount of correlation between each tree, which reduces the variance in our model. We repeat this for many bootstrap resamples, then predict each observation in the test set on all of the trees and average the predictions.
+
+Since random forests use bootstrap resampling, they have the same assumption as bootstrapping, which is that our data is representative of the population. Since our sample contains the data of all episodes up to 2023, this assumption is met.
+
+I used 5-fold cross-validation to tune `mtry`, which is the number of predictors available at each split. Low values of `mtry` lead to more different (less correlated) decision trees since they are less likely to use the same predictors to make splits, which leads to models with higher bias. On the other hand, high values of `mtry` leads to more correlated decision trees, which leads to models with higher variance. 5-fold cross-validation aims to find the optimal value of `mtry` with a balanced amount of bias and variance by splitting the data into 5 subsets, training a model on 4 subsets and predicting on the 5th subset, repeating this process for each of the subsets at different values of `mtry`, and finding the value of `mtry` that led to the best performing model on average.
+
+```{r}
+#| label: random forest model
+
+rf_model <- rand_forest(
+  mode = "regression",
+  engine = "ranger"
+) |>
+  set_args(
+    seed = 437,
+    mtry = tune(),
+    importance = "permutation"
+  )
+
+rf_recipe <- recipe(
+  AverageRating ~ Episode + Runtime + NumberOfVotes,
+  data = nopilot_train
+)
+
+rf_wflow <- workflow() |>
+  add_model(rf_model) |>
+  add_recipe(rf_recipe)
+
+# cross validation
+set.seed(437)
+sp_kfold <- vfold_cv(nopilot_train, v = 5, repeats = 2)
+
+rf_grid <- expand.grid(mtry = seq(1, 3))
+
+rf_tune <- tune_grid(
+  rf_wflow,
+  grid = rf_grid,
+  resamples = sp_kfold,
+  metrics = metric_set(rmse)
+)
+
+rf_best <- select_best(rf_tune, metric = "rmse")
+
+# fitting the model
+rf_wflow_final <- rf_wflow |>
+  finalize_workflow(parameters = rf_best)
+
+rf_fit <- fit(rf_wflow_final, data = nopilot_train)
+
+# avg rmse and standard error of avg rmse
+rf_tune |>
+  collect_metrics() |>
+  filter(mtry == rf_best$mtry) |>
+  dplyr::select(mean, std_err)
+```
+
+From the value of `mtry` chosen in our cross validation, we see that we got an average RMSE of about 0.475. Since this is small, it means our model is quite accurate. We also got a standard error of average RMSE of about 0.022. This is very small, which means our model is very robust.
+
+## Conclusion
+
+My goal was to predict the average rating of South Park episodes on IMDb. In my exploratory data analysis, I found that most of the variables in the data were not actually useful to include in my modeling. The only usable variables found were `AverageRating`, which was my response variable, `NumberOfVotes`, and `Runtime`. `NumberOfVotes` was found to have notable outliers, and `Runtime` was also found to have a few outliers with the majority of episodes having a runtime of 22 minutes. Using these variables, I was able to fit a fairly accurate random forest model to predict the average rating.
+
+### Limitations and Future Work
+
+This random forest model falls flat in certain cases. We can look at the predictions on the test set sorted by most to least error to get a better understanding of this.
+
+```{r}
+#| label: episodes with most error
+sp_preds <- augment(rf_fit, new_data = sp_test)
+sp_preds |>
+  mutate(
+    abs_resid = abs(AverageRating - .pred)
+  ) |>
+  arrange(
+    desc(abs_resid)
+  ) |>
+  select(PrimaryTitle, AverageRating, .pred, abs_resid)
+```
+
+As we can see, the model consistently makes poorer predictions on episodes with an average rating of less than 7 stars. This makes sense, considering that in the histogram of `AverageRating` seen in the exploratory data analysis, we saw that most episodes get an average rating above 7 stars.
+
+```{r}
+#| label: AverageRating histogram from EDA
+#| message: FALSE
+
+ggplot(
+  data = sp_train,
+  mapping = aes(
+    x = AverageRating
+  )
+) +
+  geom_histogram() +
+  labs(
+    x = "Average Rating out of 10",
+    y = "Number of Episodes",
+    title = "South Park IMDb"
+  )
+```
+
+However, this means that if an episode does poorly on average, we would not be able to predict that using the model. Thus, this model may not be useful in actually answering the question of whether or not an episode performed well among audiences.
+
+Data that is collected through a truly random sample, rather than through a voluntary sample as is the case on IMDb, may be more useful in creating a model that predicts the performance of an episode. Furthermore, the fact that all of the data comes from the IMDb page for South Park means that in practice, a model such as the one shown here may not be useful. This is because if we need the information from IMDb to find the number of votes for an episode in order to estimate the average rating, we could also simply look up the average rating on IMDb.
