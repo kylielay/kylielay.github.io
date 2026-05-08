@@ -1,5 +1,0 @@
----
-title: "Final Project"
----
-
-This page will contain my Math 437 final project.
