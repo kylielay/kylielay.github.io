@@ -11,6 +11,7 @@ Furthermore, since the data on IMDb comes from a voluntary sample, the response 
 ```{r}
 #| label: AverageRating histogram for summary
 #| message: FALSE
+#| echo: FALSE
 
 ggplot2::ggplot(
   data = SouthParkRshiny::SouthPark_IMDB_Data[which(SouthParkRshiny::SouthPark_IMDB_Data$Year <= 2013),],
