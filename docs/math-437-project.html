@@ -185,7 +185,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="summary" class="level2">
 <h2 class="anchored" data-anchor-id="summary">Summary</h2>
-<p>My objective was to predict the average rating of a South Park episode on IMDb. Ultimately, I found that the model I came up with doesn’t have any practical uses, since both the response and the predictors are equally accessible on the same website.</p>
+<p>My objective was to predict the average rating of a South Park episode on IMDb. Ultimately, I found that the k-nearest neighbors model I came up with doesn’t have any practical uses, since both the response and the predictors are equally accessible on the same website.</p>
 <p>Furthermore, since the data on IMDb comes from a voluntary sample, the response variable (the average rating of an episode) tended to be very high. This can be seen in the histogram below showing data from the training set, where the x-axis shows the average rating out of 10 stars and the heights of the bars show the number of episodes with that average rating. We can see that the histogram is centered at about 8 stars, with only a few episodes getting an average rating below 7 stars.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>ggplot2<span class="sc">::</span><span class="fu">ggplot</span>(</span>
@@ -249,7 +249,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="even">
 <td><a href="https://parsnip.tidymodels.org/">parsnip</a></td>
-<td>to create the random forest model</td>
+<td>to create the model</td>
 </tr>
 <tr class="odd">
 <td><a href="https://recipes.tidymodels.org/">recipes</a></td>
@@ -283,7 +283,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="data-wrangling" class="level2">
 <h2 class="anchored" data-anchor-id="data-wrangling">Data Wrangling</h2>
-<p>I split the data by putting episodes from 2013 or earlier into the training set, and episodes from after 2013 into the test set. This left me with a reasonable amount of data in both sets (248 observations in the training set and 78 observations in the test set). I did the split based on the year the episodes were aired because this puts the earliest episodes in the training set and the latest episodes in the test set, which prevents our analysis later from being biased by data “from the future.”</p>
+<p>I split the data by putting episodes from 2013 or earlier into the training set, and episodes from after 2013 into the test set. This left me with a reasonable amount of data in both sets (248 observations in the training set and 78 observations in the test set). I did the split based on the year the episodes were aired because this puts the earliest episodes in the training set and the latest episodes in the test set, which prevents our analysis later from being biased by data “from the future.” Since the data set is very clean and has few variables, no further data wrangling was required.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>sp_train <span class="ot">&lt;-</span> SouthPark_IMDB_Data[<span class="fu">which</span>(SouthPark_IMDB_Data<span class="sc">$</span>Year <span class="sc">&lt;=</span> <span class="dv">2013</span>),]</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>sp_test <span class="ot">&lt;-</span> SouthPark_IMDB_Data[<span class="fu">which</span>(SouthPark_IMDB_Data<span class="sc">$</span>Year <span class="sc">&gt;</span> <span class="dv">2013</span>),]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -336,21 +336,43 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>This begs the question, how does a show as controversial as South Park get such high average ratings? If we look at the IMDb page for South Park, we do see that it tends to get an overwhelming amount of high ratings compared to low ratings. Looking at other shows on IMDb, we see that they also tend to get higher average ratings in general, so this isn’t something specific to South Park. It could be that users don’t want to have disliked shows on their profile, or that they don’t watch disliked episodes for long enough to give them a rating, but this is ultimately all speculation. However, it could be important to consider when using the average rating to measure the general reception of an episode that the information on IMDb comes from a voluntary sample. The average rating on IMDb might be higher than if we took a truly random sample of people who watched South Park and asked for their ratings.</p>
 <p>Next, I moved on to the rest of the variables in the data set. I ignored the <code>PrimaryTitle</code> and <code>OriginalTitle</code> variables, since they basically serve as ID variables.</p>
-<p>The <code>Season</code>, <code>Episode</code>, and <code>Year</code> variables serve to catalog when an episode was made. Since I split my data based on <code>Year</code>, these did not seem appropriate to include in my model.</p>
-<p>The histogram of <code>Runtime</code> doesn’t yield anything surprising.</p>
+<p>I suspected that the <code>Season</code> and <code>Year</code> variables might be highly correlated, since seasons are numbered in order of when they came out. To see if this was the case, I looked at a scatterplot for <code>Season</code> and <code>Year</code>. Each point represents one episode, although multiple points are stacked on top of each other because multiple episodes come out in the same season and year.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> Runtime</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>() <span class="sc">+</span></span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Runtime (minutes)"</span>,</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Number of Episodes"</span>,</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> Season,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> Year</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="math-437-project_files/figure-html/Season &amp; Year scatterplot-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see, <code>Season</code> and <code>Year</code> are almost perfectly linearly correlated, with only three of the earliest seasons spanning across two years. Thus, we don’t want to use both of these variables in our modeling due to collinearity issues, which would lead to inflated standard errors and unreliable coefficient estimates. If these variables were to be included in the model, we would have to choose between one or the other, depending on which one seems more informative for our response. However, since the <code>Season</code> and <code>Year</code> variables serve to catalog when an episode was made, and I split my data based on <code>Year</code>, neither of these seemed appropriate to include in my model.</p>
+<p>The <code>Episode</code> variable also serves to catalog when an episode was made, and I did not believe this would yield anything interesting when looked at on its own.</p>
+<p>The histogram of <code>Runtime</code> doesn’t yield anything surprising.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> Runtime</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>() <span class="sc">+</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Runtime (minutes)"</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Number of Episodes"</span>,</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -359,20 +381,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 </div>
-<p>An overwhelming majority of episodes have a runtime of about 22 minutes, with a few episodes being especially long. This is to be expected, since most television series have episodes that run for about 20 minutes, with some having TV specials that run for longer than an average episode. This means that for the majority of episodes, <code>Runtime</code> isn’t a very informative variable. However, this may be relevant for analyzing particularly long episodes.</p>
+<p>An overwhelming majority of episodes have a runtime of about 22 minutes, with a few episodes being especially long. This is to be expected, since most television series have episodes that run for about 20 minutes. I thought the longer episodes might be TV specials, which run for longer than an average episode, but this does not seem to be the case. In fact, other than the unaired pilot having a 28 minute runtime, there does not seem to be anything special about the longer episodes, so it could simply be that these episodes just turned out longer. This means that for the majority of episodes, <code>Runtime</code> isn’t a very informative variable. However, particularly long runtimes may have an effect on the average rating.</p>
 <p>I thought that the <code>NumberOfVotes</code> variable would be the most informative variable, so I decided to explore it in more detail. Since South Park is a popular show, I expected <code>NumberOfVotes</code> to have a high center, somewhere in the thousands. Some episodes will be more popular than others, so I assumed there would be a high amount of variability.</p>
 <p>Looking at the 5 number summary as well as the mean and standard deviation of <code>NumberOfVotes</code>, we can see that my guesses were correct. However, the mean is noticeably higher than the median, suggesting a right-skewed distribution.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>sp_train <span class="sc">|&gt;</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">min =</span> <span class="fu">min</span>(NumberOfVotes),</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">Q1 =</span> <span class="fu">quantile</span>(NumberOfVotes, <span class="fl">0.25</span>),</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">median =</span> <span class="fu">median</span>(NumberOfVotes),</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">Q3 =</span> <span class="fu">quantile</span>(NumberOfVotes, <span class="fl">0.75</span>),</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">max =</span> <span class="fu">max</span>(NumberOfVotes),</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean =</span> <span class="fu">mean</span>(NumberOfVotes),</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">sd =</span> <span class="fu">sd</span>(NumberOfVotes)</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>sp_train <span class="sc">|&gt;</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">min =</span> <span class="fu">min</span>(NumberOfVotes),</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">Q1 =</span> <span class="fu">quantile</span>(NumberOfVotes, <span class="fl">0.25</span>),</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">median =</span> <span class="fu">median</span>(NumberOfVotes),</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">Q3 =</span> <span class="fu">quantile</span>(NumberOfVotes, <span class="fl">0.75</span>),</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">max =</span> <span class="fu">max</span>(NumberOfVotes),</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean =</span> <span class="fu">mean</span>(NumberOfVotes),</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">sd =</span> <span class="fu">sd</span>(NumberOfVotes)</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 1 × 7
     min    Q1 median    Q3   max  mean    sd
@@ -382,18 +404,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>We have a much better idea of the extremeness of this skew when looking at the histogram.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> NumberOfVotes</span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>() <span class="sc">+</span></span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Number of Votes on IMDb"</span>,</span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Number of Episodes"</span>,</span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
-<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> NumberOfVotes</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>() <span class="sc">+</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Number of Votes on IMDb"</span>,</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Number of Episodes"</span>,</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -404,33 +426,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>This skew seems to have been made even more extreme by a few outliers. This leads me to question, what are these points, and why do they have so many more votes?</p>
 <p>The point on the far right corresponds to the episode “Scott Tenorman Must Die,” which had one of the best receptions out of any South Park episode when it released. The other two rightmost points correspond to the episodes “Make Love, Not Warcraft” and “The Return of the Fellowship of the Ring to the Two Towers,” whose popularity could be attributed to the obvious references in their titles attracting more viewers.</p>
-<p>Another interesting point is the one on the far left, which corresponds to the unaired pilot. It makes sense that this wouldn’t get as many votes, since the pilot of a show tends to be seen by less people.</p>
+<p>Another interesting point is the one on the far left, which corresponds to the unaired pilot. It makes sense that this wouldn’t get as many votes, since the pilot of a show tends to be seen by less people as it isn’t aired on television.</p>
 <p>Looking at <code>AverageRating</code> and <code>NumberOfVotes</code> on their own made me wonder if there was a more direct connection between the average rating of a show and how many votes it got. I assumed that an episode having more votes meant it was more popular, and thus had a higher average rating.</p>
 <p>We can look at a scatterplot between <code>NumberOfVotes</code> and <code>AverageRating</code>, where each point represents one episode.</p>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> NumberOfVotes,</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> AverageRating</span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Number of Votes on IMDb"</span>,</span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Average Rating out of 10"</span>,</span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="math-437-project_files/figure-html/NumberOfVotes &amp; AverageRating scatterplot-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>My assumption generally appears to be true.</p>
-<p>Due to what was found earlier, I believe the relationship between <code>NumberOfVotes</code> and <code>AverageRating</code> would give me the most useful information compared to other relationships. Thus, I decided to follow up on the scatterplot between <code>NumberOfVotes</code> and <code>AverageRating</code>. Since the relationship appears nonlinear, we can plot a local regression curve to get a better idea of the relationship.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
@@ -444,11 +442,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Number of Votes on IMDb"</span>,</span>
 <span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Average Rating out of 10"</span>,</span>
 <span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(</span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">"loess"</span>,</span>
-<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">se =</span> <span class="cn">FALSE</span></span>
-<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="math-437-project_files/figure-html/NumberOfVotes &amp; AverageRating scatterplot-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>My assumption generally appears to be true.</p>
+<p>Due to what was found earlier, I believe the relationship between <code>NumberOfVotes</code> and <code>AverageRating</code> would give me the most useful information compared to other relationships. Thus, I decided to follow up on the scatterplot between <code>NumberOfVotes</code> and <code>AverageRating</code>. Since the relationship appears nonlinear, we can plot a local regression curve to get a better idea of the relationship.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> NumberOfVotes,</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> AverageRating</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Number of Votes on IMDb"</span>,</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Average Rating out of 10"</span>,</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">"loess"</span>,</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">se =</span> <span class="cn">FALSE</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -461,25 +483,25 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Since this point has the least number of votes, we can deduce that it belongs to the unaired pilot. Since all future episodes of South Park will be aired, this point is probably not relevant to our analysis of future episodes. We might consider removing that point and only looking at episodes that were aired on television.</p>
 <p>How does removing this point change our model? Below is a scatterplot with the point removed.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>nopilot_train <span class="ot">&lt;-</span> sp_train[<span class="sc">-</span><span class="fu">which</span>(sp_train<span class="sc">$</span>PrimaryTitle <span class="sc">==</span> <span class="st">"Unaired Pilot"</span>),]</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nopilot_train,</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> NumberOfVotes,</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> AverageRating</span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Number of Votes on IMDb"</span>,</span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Average Rating out of 10"</span>,</span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb without the Pilot"</span></span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(</span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">"loess"</span>,</span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">se =</span> <span class="cn">FALSE</span></span>
-<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>nopilot_train <span class="ot">&lt;-</span> sp_train[<span class="sc">-</span><span class="fu">which</span>(sp_train<span class="sc">$</span>PrimaryTitle <span class="sc">==</span> <span class="st">"Unaired Pilot"</span>),]</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nopilot_train,</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> NumberOfVotes,</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> AverageRating</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Number of Votes on IMDb"</span>,</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Average Rating out of 10"</span>,</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb without the Pilot"</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">"loess"</span>,</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">se =</span> <span class="cn">FALSE</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -489,115 +511,166 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <p>The local regression curve seems to be doing a better job of fitting the data on the left side of the graph now that the pilot was removed. The outliers on the right side of the graph pose no issue, since they follow the trend of the rest of the data.</p>
+<p>For the remaining data, we might think that some episodes have less votes because they came later, and thus have been seen by less people. We can look at a scatterplot for <code>Season</code> and <code>NumberOfVotes</code> to see if this is the case.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nopilot_train,</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> Season,</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> NumberOfVotes</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Season"</span>,</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Number of Votes on IMDb"</span>,</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb without the Pilot"</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="math-437-project_files/figure-html/Season &amp; NumberOfVotes scatterplot-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>While there may be a slightly downward trend, this does not seem to be the case in general.</p>
 <p>Due to what I found, I decided to make my model using the training set with the pilot removed.</p>
 </section>
 <section id="modeling" class="level2">
 <h2 class="anchored" data-anchor-id="modeling">Modeling</h2>
-<p>Here, I fit a random forest model predicting <code>AverageRating</code> from <code>Episode</code>, <code>Runtime</code>, and <code>NumberOfVotes</code>. Random forests use decision trees, which try to put similar observations into the same regions as each other. The way decision trees do this is by splitting one region into two based on the value of a certain predictor, then repeating this process until we tell it to stop. In random forests, we take a random sample from our data with replacement, called a bootstrap resample. Then, we fit a decision tree on that bootstrap resample, but at each split, we restrict the number of predictors available. We do this in order to decrease the amount of correlation between each tree, which reduces the variance in our model. We repeat this for many bootstrap resamples, then predict each observation in the test set on all of the trees and average the predictions.</p>
-<p>Since random forests use bootstrap resampling, they have the same assumption as bootstrapping, which is that our data is representative of the population. Since our sample contains the data of all episodes up to 2023, this assumption is met.</p>
-<p>I used 5-fold cross-validation to tune <code>mtry</code>, which is the number of predictors available at each split. Low values of <code>mtry</code> lead to more different (less correlated) decision trees since they are less likely to use the same predictors to make splits, which leads to models with higher bias. On the other hand, high values of <code>mtry</code> leads to more correlated decision trees, which leads to models with higher variance. 5-fold cross-validation aims to find the optimal value of <code>mtry</code> with a balanced amount of bias and variance by splitting the data into 5 subsets, training a model on 4 subsets and predicting on the 5th subset, repeating this process for each of the subsets at different values of <code>mtry</code>, and finding the value of <code>mtry</code> that led to the best performing model on average.</p>
+<p>Here, I fit a k-nearest neighbors model predicting <code>AverageRating</code> from <code>Episode</code>, <code>Runtime</code>, and <code>NumberOfVotes</code>.</p>
+<p>The way this model makes predictions for an observation is, for some positive integer k that we choose, it finds the k closest points in the training set to that observation. If our response is numerical, it predicts the average of those points’ response values, and if our response is categorical, it predicts the most common class among those points. These points may also be weighted so that points that are closer to the observation have more influence over the predicted value or class of that observation. K-nearest neighbors does not make any assumptions.</p>
+<p>When fitting the k-nearest neighbors model below, we will tune <code>neighbors</code>. This represents the “k” mentioned above, or the number of closest points to an observation that the model will consider when making predictions. For lower values of <code>neighbors</code>, the model will have higher variance and lower bias because the average response value (or most common class) will only be calculated using a few points (possibly even only one point), so predictions will vary greatly if a new point is added. For higher values of <code>neighbors</code>, the model will have higher bias and lower variance because the average response value (or most common class) will be calculated using the majority (if not all) of the training data, so adding a new point will not greatly influence the predictions.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>rf_model <span class="ot">&lt;-</span> <span class="fu">rand_forest</span>(</span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">mode =</span> <span class="st">"regression"</span>,</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">engine =</span> <span class="st">"ranger"</span></span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_args</span>(</span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">seed =</span> <span class="dv">437</span>,</span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">mtry =</span> <span class="fu">tune</span>(),</span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">importance =</span> <span class="st">"permutation"</span></span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>rf_recipe <span class="ot">&lt;-</span> <span class="fu">recipe</span>(</span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>  AverageRating <span class="sc">~</span> Episode <span class="sc">+</span> Runtime <span class="sc">+</span> NumberOfVotes,</span>
-<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nopilot_train</span>
-<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>rf_wflow <span class="ot">&lt;-</span> <span class="fu">workflow</span>() <span class="sc">|&gt;</span></span>
-<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_model</span>(rf_model) <span class="sc">|&gt;</span></span>
-<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_recipe</span>(rf_recipe)</span>
-<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="co"># cross validation</span></span>
-<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">437</span>)</span>
-<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>sp_kfold <span class="ot">&lt;-</span> <span class="fu">vfold_cv</span>(nopilot_train, <span class="at">v =</span> <span class="dv">5</span>, <span class="at">repeats =</span> <span class="dv">2</span>)</span>
-<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>rf_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">mtry =</span> <span class="fu">seq</span>(<span class="dv">1</span>, <span class="dv">3</span>))</span>
-<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>rf_tune <span class="ot">&lt;-</span> <span class="fu">tune_grid</span>(</span>
-<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>  rf_wflow,</span>
-<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>  <span class="at">grid =</span> rf_grid,</span>
-<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>  <span class="at">resamples =</span> sp_kfold,</span>
-<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>  <span class="at">metrics =</span> <span class="fu">metric_set</span>(rmse)</span>
-<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>rf_best <span class="ot">&lt;-</span> <span class="fu">select_best</span>(rf_tune, <span class="at">metric =</span> <span class="st">"rmse"</span>)</span>
-<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a><span class="co"># fitting the model</span></span>
-<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a>rf_wflow_final <span class="ot">&lt;-</span> rf_wflow <span class="sc">|&gt;</span></span>
-<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">finalize_workflow</span>(<span class="at">parameters =</span> rf_best)</span>
-<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a>rf_fit <span class="ot">&lt;-</span> <span class="fu">fit</span>(rf_wflow_final, <span class="at">data =</span> nopilot_train)</span>
-<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-41"><a href="#cb15-41" aria-hidden="true" tabindex="-1"></a><span class="co"># avg rmse and standard error of avg rmse</span></span>
-<span id="cb15-42"><a href="#cb15-42" aria-hidden="true" tabindex="-1"></a>rf_tune <span class="sc">|&gt;</span></span>
-<span id="cb15-43"><a href="#cb15-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect_metrics</span>() <span class="sc">|&gt;</span></span>
-<span id="cb15-44"><a href="#cb15-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(mtry <span class="sc">==</span> rf_best<span class="sc">$</span>mtry) <span class="sc">|&gt;</span></span>
-<span id="cb15-45"><a href="#cb15-45" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(mean, std_err)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>knn_model <span class="ot">&lt;-</span> <span class="fu">nearest_neighbor</span>(</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">mode =</span> <span class="st">"regression"</span>,</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">neighbors =</span> <span class="fu">tune</span>(),</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">dist_power =</span> <span class="dv">2</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>knn_recipe <span class="ot">&lt;-</span> <span class="fu">recipe</span>(</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  AverageRating <span class="sc">~</span> Episode <span class="sc">+</span> Runtime <span class="sc">+</span> NumberOfVotes,</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> nopilot_train</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_normalize</span>(<span class="fu">all_numeric_predictors</span>())</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>knn_wflow <span class="ot">&lt;-</span> <span class="fu">workflow</span>() <span class="sc">|&gt;</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_model</span>(knn_model) <span class="sc">|&gt;</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_recipe</span>(knn_recipe)</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a><span class="co"># cross validation</span></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">437</span>)</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>sp_kfold <span class="ot">&lt;-</span> <span class="fu">vfold_cv</span>(nopilot_train, <span class="at">v =</span> <span class="dv">5</span>, <span class="at">repeats =</span> <span class="dv">2</span>)</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>knn_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(<span class="at">neighbors =</span> <span class="fu">seq</span>(<span class="dv">10</span>, <span class="dv">100</span>, <span class="at">by =</span> <span class="dv">10</span>))</span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>knn_tune <span class="ot">&lt;-</span> knn_wflow <span class="sc">|&gt;</span></span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tune_grid</span>(</span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">resamples =</span> sp_kfold,</span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">grid =</span> knn_grid,</span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">metrics =</span> <span class="fu">metric_set</span>(rmse)</span>
+<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>→ A | warning: package 'kknn' was built under R version 4.5.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>There were issues with some computations   A: x1
+There were issues with some computations   A: x1</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code></code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>knn_best <span class="ot">&lt;-</span> <span class="fu">select_best</span>(knn_tune, <span class="at">metric =</span> <span class="st">"rmse"</span>)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="co"># fitting the model</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>knn_wflow_final <span class="ot">&lt;-</span> knn_wflow <span class="sc">|&gt;</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">finalize_workflow</span>(<span class="at">parameters =</span> knn_best)</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>knn_fit <span class="ot">&lt;-</span> <span class="fu">fit</span>(knn_wflow_final, <span class="at">data =</span> nopilot_train)</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="co"># avg rmse and standard error of avg rmse</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>knn_tune <span class="sc">|&gt;</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect_metrics</span>() <span class="sc">|&gt;</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(neighbors <span class="sc">==</span> knn_best<span class="sc">$</span>neighbors) <span class="sc">|&gt;</span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(mean, std_err)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 1 × 2
    mean std_err
   &lt;dbl&gt;   &lt;dbl&gt;
-1 0.475  0.0215</code></pre>
+1 0.476  0.0223</code></pre>
 </div>
 </div>
-<p>From the value of <code>mtry</code> chosen in our cross validation, we see that we got an average RMSE of about 0.475. Since this is small, it means our model is quite accurate. We also got a standard error of average RMSE of about 0.022. This is very small, which means our model is very robust.</p>
+<p>From the value of <code>neighbors</code> we chose in our cross validation, we see that we got an average RMSE of about 0.476 and a standard error of about 0.022. To know if this is good or not, let’s compare it to what we would get with the null model (k-nearest neighbors model with 247 neighbors, the largest value of neighbors possible with our data).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># cross validation</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>knn_tune_null <span class="ot">&lt;-</span> knn_wflow <span class="sc">|&gt;</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tune_grid</span>(</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">resamples =</span> sp_kfold,</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">grid =</span> <span class="fu">expand.grid</span>(<span class="at">neighbors =</span> <span class="dv">247</span>),</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">metrics =</span> <span class="fu">metric_set</span>(rmse)</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a><span class="co"># avg rmse and standard error of avg rmse</span></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>knn_tune_null <span class="sc">|&gt;</span></span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect_metrics</span>() <span class="sc">|&gt;</span></span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(mean, std_err)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1 × 2
+   mean std_err
+  &lt;dbl&gt;   &lt;dbl&gt;
+1 0.552  0.0203</code></pre>
+</div>
+</div>
+<p>We see that the null model gives us an average RMSE of about 0.552 and a standard error of about 0.020. The standard error is close to what we got with our tuned model, and the average RMSE is a bit higher. Thus, our model is performing slightly better than the null model.</p>
 </section>
 <section id="conclusion" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
-<p>My goal was to predict the average rating of South Park episodes on IMDb. In my exploratory data analysis, I found that most of the variables in the data were not actually useful to include in my modeling. The only usable variables found were <code>AverageRating</code>, which was my response variable, <code>NumberOfVotes</code>, and <code>Runtime</code>. <code>NumberOfVotes</code> was found to have notable outliers, and <code>Runtime</code> was also found to have a few outliers with the majority of episodes having a runtime of 22 minutes. Using these variables, I was able to fit a fairly accurate random forest model to predict the average rating.</p>
+<p>My goal was to predict the average rating of South Park episodes on IMDb. In my exploratory data analysis, I found that many of the variables in the data were not actually useful to include in my modeling. Variables that yielded interesting results were <code>NumberOfVotes</code>, which was found to have notable outliers, and <code>Runtime</code>, which was also found to have a few outliers with the majority of episodes having a runtime of 22 minutes. Using these variables as well as the <code>AverageRating</code> and <code>Episode</code> variables, I was able to fit a k-nearest neighbors model to predict the average rating of an episode. This model performed better than the null model.</p>
 <section id="limitations-and-future-work" class="level3">
 <h3 class="anchored" data-anchor-id="limitations-and-future-work">Limitations and Future Work</h3>
-<p>This random forest model falls flat in certain cases. We can look at the predictions on the test set sorted by most to least error to get a better understanding of this.</p>
+<p>This k-nearest neighbors model falls flat in certain cases. We can look at the predictions on the test set sorted by highest to lowest residuals in absolute value to get a better understanding of this.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>sp_preds <span class="ot">&lt;-</span> <span class="fu">augment</span>(rf_fit, <span class="at">new_data =</span> sp_test)</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>sp_preds <span class="sc">|&gt;</span></span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">abs_resid =</span> <span class="fu">abs</span>(AverageRating <span class="sc">-</span> .pred)</span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(</span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">desc</span>(abs_resid)</span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(PrimaryTitle, AverageRating, .pred, abs_resid)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>sp_preds <span class="ot">&lt;-</span> <span class="fu">augment</span>(knn_fit, <span class="at">new_data =</span> sp_test)</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>sp_preds <span class="sc">|&gt;</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">abs_resid =</span> <span class="fu">abs</span>(AverageRating <span class="sc">-</span> .pred)</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">desc</span>(abs_resid)</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(PrimaryTitle, AverageRating, .pred, abs_resid)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 78 × 4
-   PrimaryTitle                     AverageRating .pred abs_resid
-   &lt;chr&gt;                                    &lt;dbl&gt; &lt;dbl&gt;     &lt;dbl&gt;
- 1 South Park: The Streaming Wars             6.7  8.59     1.89 
- 2 The Streaming Wars Part 2                  6.6  8.01     1.41 
- 3 Spring Break                               6.5  7.73     1.23 
- 4 White People Renovating Houses             6.8  7.99     1.19 
- 5 The Problem with a Poo                     6.4  7.56     1.16 
- 6 #HappyHolograms                            6.8  7.84     1.04 
- 7 Back to the Cold War                       6.6  7.50     0.899
- 8 Post Covid - The Return of Covid           7.5  8.38     0.880
- 9 South Park: Post COVID                     7.5  8.31     0.809
-10 Deep Learning                              8.3  7.50     0.801
+   PrimaryTitle                           AverageRating .pred abs_resid
+   &lt;chr&gt;                                          &lt;dbl&gt; &lt;dbl&gt;     &lt;dbl&gt;
+ 1 South Park: The Streaming Wars                   6.7  8.09     1.39 
+ 2 The Streaming Wars Part 2                        6.6  7.99     1.39 
+ 3 The Problem with a Poo                           6.4  7.68     1.28 
+ 4 White People Renovating Houses                   6.8  8.04     1.24 
+ 5 #HappyHolograms                                  6.8  7.95     1.15 
+ 6 Spring Break                                     6.5  7.62     1.12 
+ 7 Back to the Cold War                             6.6  7.68     1.08 
+ 8 The End of Serialization as We Know It           7.1  7.96     0.860
+ 9 The Cissy                                        8.5  7.71     0.787
+10 South Park: Post COVID                           7.5  8.28     0.777
 # ℹ 68 more rows</code></pre>
 </div>
 </div>
-<p>As we can see, the model consistently makes poorer predictions on episodes with an average rating of less than 7 stars. This makes sense, considering that in the histogram of <code>AverageRating</code> seen in the exploratory data analysis, we saw that most episodes get an average rating above 7 stars.</p>
+<p>As we can see, the model consistently makes poorer predictions on episodes with an average rating of less than 7 stars compared to other episodes. This makes sense considering that in the histogram of <code>AverageRating</code> seen in the exploratory data analysis, we saw that most episodes get an average rating above 7 stars.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> AverageRating</span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>() <span class="sc">+</span></span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Average Rating out of 10"</span>,</span>
-<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Number of Episodes"</span>,</span>
-<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
-<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> sp_train,</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mapping =</span> <span class="fu">aes</span>(</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> AverageRating</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>() <span class="sc">+</span></span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Average Rating out of 10"</span>,</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Number of Episodes"</span>,</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"South Park IMDb"</span></span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -606,7 +679,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 </div>
-<p>However, this means that if an episode does poorly on average, we would not be able to predict that using the model. Thus, this model may not be useful in actually answering the question of whether or not an episode performed well among audiences.</p>
+<p>However, this means that if an episode has a low average rating, we would not be able to accurately predict that using this model. Thus, this model may not be useful in actually answering the question of whether or not an episode performed well among audiences.</p>
 <p>Data that is collected through a truly random sample, rather than through a voluntary sample as is the case on IMDb, may be more useful in creating a model that predicts the performance of an episode. Furthermore, the fact that all of the data comes from the IMDb page for South Park means that in practice, a model such as the one shown here may not be useful. This is because if we need the information from IMDb to find the number of votes for an episode in order to estimate the average rating, we could also simply look up the average rating on IMDb.</p>
 
 
