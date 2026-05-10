@@ -347,6 +347,7 @@ When fitting the k-nearest neighbors model below, we will tune `neighbors`. This
 
 ```{r}
 #| label: k-nearest neighbors model tuned
+#| message: FALSE
 
 knn_model <- nearest_neighbor(
   mode = "regression",
@@ -440,6 +441,7 @@ As we can see, the model consistently makes poorer predictions on episodes with 
 ```{r}
 #| label: AverageRating histogram from EDA
 #| message: FALSE
+#| echo: FALSE
 
 ggplot(
   data = sp_train,
