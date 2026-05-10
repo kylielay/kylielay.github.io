@@ -228,7 +228,7 @@ This skew seems to have been made even more extreme by a few outliers. This lead
 
 The point on the far right corresponds to the episode "Scott Tenorman Must Die," which had one of the best receptions out of any South Park episode when it released. The other two rightmost points correspond to the episodes "Make Love, Not Warcraft" and "The Return of the Fellowship of the Ring to the Two Towers," whose popularity could be attributed to the obvious references in their titles attracting more viewers.
 
-Another interesting point is the one on the far left, which corresponds to the unaired pilot. It makes sense that this wouldn't get as many votes, since the pilot of a show tends to be seen by less people as it isn't aired on television.
+Another interesting point is the one on the far left, which corresponds to the unaired pilot. It makes sense that this wouldn't get as many votes, since the pilot of a show tends to be seen by less people. This is especially true for South Park's pilot, since it was never aired on television.
 
 Looking at `AverageRating` and `NumberOfVotes` on their own made me wonder if there was a more direct connection between the average rating of a show and how many votes it got. I assumed that an episode having more votes meant it was more popular, and thus had a higher average rating.
 
